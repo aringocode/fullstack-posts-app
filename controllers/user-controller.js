@@ -51,19 +51,22 @@ const UserController = {
 		}
 
 		try {
+			// Find the user
 			const user = await prisma.user.findUnique({ where: { email } });
 
 			if (!user) {
 				return res.status(400).json({ error: 'Invalid login or password' });
 			}
 
+			// Check the password
 			const valid = await bcrypt.compare(password, user.password);
 
 			if (!valid) {
 				return res.status(400).json({ error: 'Invalid login or password' });
 			}
 
-			const token = jwt.sign(({ userId: user.id }), 'SECRET_KEY');
+			// Generate a JWT
+			const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY);
 
 			res.json({ token });
 		} catch (e) {
@@ -72,7 +75,36 @@ const UserController = {
 		}
 	},
 	getUserById: async (req, res) => {
-		res.send('getUserById')
+		const { id } = req.params;
+		const userId = req.user.userId;
+
+		try {
+			const user = await prisma.user.findUnique({
+				where: { id },
+				include: {
+					followers: true,
+					following: true,
+				}
+			})
+
+			if (!user) {
+				return res.status(404).json({ error: 'User not found' });
+			}
+
+			const isFollowing = await prisma.follows.findFirst({
+				where: {
+					AND: [
+						{ followerId: userId },
+						{ followingId: id }
+					]
+				}
+			})
+
+			res.json({ ...user, isFollowing: Boolean(isFollowing) });
+		} catch (e) {
+			console.error('Get Current Error', e);
+			res.status(500).json({ error: 'Internal server error' });
+		}
 	},
 	updateUser: async (req, res) => {
 		res.send('updateUser')
