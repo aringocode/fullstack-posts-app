@@ -3,13 +3,14 @@ const bcrypt = require('bcryptjs');
 const Jdenticon = require('jdenticon');
 const path = require('path');
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
 
 const UserController = {
 	register: async (req, res) => {
 		const { email, password, name } = req.body;
 
 		if (!email || !password || !name) {
-			return res.status(400).json({ error: 'All fields are required'});
+			return res.status(400).json({ error: 'All fields are required' });
 		}
 
 		try {
@@ -39,11 +40,36 @@ const UserController = {
 
 		} catch (e) {
 			console.error('Error in register', e);
-			res.status(500).json({ error: 'Internal server error '});
+			res.status(500).json({ error: 'Internal server error' });
 		}
 	},
 	login: async (req, res) => {
-		res.send('login')
+		const { email, password } = req.body;
+
+		if (!email || !password) {
+			return res.status(400).json({ error: 'All fields are required' });
+		}
+
+		try {
+			const user = await prisma.user.findUnique({ where: { email } });
+
+			if (!user) {
+				return res.status(400).json({ error: 'Invalid login or password' });
+			}
+
+			const valid = await bcrypt.compare(password, user.password);
+
+			if (!valid) {
+				return res.status(400).json({ error: 'Invalid login or password' });
+			}
+
+			const token = jwt.sign(({ userId: user.id }), 'SECRET_KEY');
+
+			res.json({ token });
+		} catch (e) {
+			console.error('Login error', e);
+			res.status(500).json({ error: 'Internal server error' });
+		}
 	},
 	getUserById: async (req, res) => {
 		res.send('getUserById')
